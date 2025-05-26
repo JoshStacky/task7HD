@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task7HD</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        input { padding: 10px; margin: 5px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .task { padding: 10px; border: 1px solid #ddd; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Task7HD</h1>
+    <p>DevOps</p>
+    
+    <h2>Add</h2>
+    <input type="text" id="taskTitle" placeholder="Title">
+    <button onclick="addTask()">Add</button>
+    
+    <h2>Tasks</h2>
+    <div id="taskList">Loading...</div>
+    
+    <h2>Status</h2>
+    <button onclick="checkHealth()">Health</button>
+    <div id="healthStatus"></div>
+    
+    <script>
+        async function addTask() {
+            const title = document.getElementById('taskTitle').value;
+            if (!title) return alert('Required');
+            
+            const response = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title: title})
+            });
+            
+            if (response.ok) {
+                document.getElementById('taskTitle').value = '';
+                loadTasks();
+            }
+        }
+        
+        async function loadTasks() {
+            const response = await fetch('/api/tasks');
+            const data = await response.json();
+            
+            const html = data.tasks.map(task => 
+                `<div class="task">
+                    <strong>${task.title}</strong> - ${task.status}
+                    <br><small>Created: ${new Date(task.created).toLocaleString()}</small>
+                </div>`
+            ).join('');
+            
+            document.getElementById('taskList').innerHTML = html || '<p>Empty</p>';
+        }
+        
+        async function checkHealth() {
+            const response = await fetch('/health');
+            const data = await response.json();
+            document.getElementById('healthStatus').innerHTML = 
+                `<p>Status: ${data.status}</p>`;
+        }
+        
+        loadTasks();
+    </script>
+</body>
+</html>
