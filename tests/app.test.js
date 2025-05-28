@@ -1,56 +1,71 @@
-const express = require('express');
-const router = express.Router();
+const request = require('supertest');
+const app = require('../src/app');
 
-// storage
-let tasks = [];
-let requestCount = 0;
+describe('Task7HD Tests', () => {
+  
+  test('Health check', async () => {
+    const response = await request(app).get('/health');
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('healthy');
+  });
 
-// Count
-router.use((req, res, next) => {
-    requestCount++;
-    next();
-});
+  test('empty', async () => {
+    const response = await request(app).get('/api/tasks');
+    expect(response.status).toBe(200);
+    expect(response.body.tasks).toEqual([]);
+  });
 
-// Health check
-router.get('/health', (req, res) => {
-    res.json({ status: 'healthy' });
-});
-
-// Status endpoint
-router.get('/status', (req, res) => {
-    res.json({ status: 'healthy', version: '1.0.0' });
-});
-
-// Metrics
-router.get('/metrics', (req, res) => {
-    res.json({ requests: requestCount, task_count: tasks.length });
-});
-
-// Task API
-router.get('/api/tasks', (req, res) => {
-    res.json({ tasks: tasks });
-});
-
-router.post('/api/tasks', (req, res) => {
-    const task = { id: Date.now(), title: req.body.title, completed: false };
-    tasks.push(task);
-    res.json({ task: task });
-});
-
-router.put('/api/tasks/:id', (req, res) => {
-    const task = tasks.find(t => t.id === parseInt(req.params.id));
-    if (!task) return res.status(404).json({ error: 'not found' });
+  test('create', async () => {
+    const response = await request(app)
+      .post('/api/tasks')
+      .send({ title: 'Test Task' });
     
-    task.title = req.body.title || task.title;
-    res.json({ task: task });
-});
+    expect(response.status).toBe(200);
+    expect(response.body.task.title).toBe('Test Task');
+    expect(response.body.task.id).toBeDefined();
+  });
 
-router.delete('/api/tasks/:id', (req, res) => {
-    const index = tasks.findIndex(t => t.id === parseInt(req.params.id));
-    if (index === -1) return res.status(404).json({ error: 'not found' });
+  test('update', async () => {
+    const createResponse = await request(app)
+      .post('/api/tasks')
+      .send({ title: 'Original Task' });
     
-    tasks.splice(index, 1);
-    res.json({ message: 'Deleted' });
-});
+    const taskId = createResponse.body.task.id;
+    
+    const updateResponse = await request(app)
+      .put(`/api/tasks/${taskId}`)
+      .send({ title: 'Updated Task' });
+    
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.task.title).toBe('Updated Task');
+  });
 
-module.exports = router;
+  test('delete task', async () => {
+    const createResponse = await request(app)
+      .post('/api/tasks')
+      .send({ title: 'Task to Delete' });
+    
+    const taskId = createResponse.body.task.id;
+    
+    const deleteResponse = await request(app)
+      .delete(`/api/tasks/${taskId}`);
+    
+    expect(deleteResponse.status).toBe(200);
+    expect(deleteResponse.body.message).toBe('Task deleted');
+  });
+
+  test('metrics endpoint', async () => {
+    const response = await request(app).get('/metrics');
+    expect(response.status).toBe(200);
+    expect(response.body.requests).toBeDefined();
+    expect(response.body.task_count).toBeDefined();
+  });
+
+  test('status endpoint', async () => {
+    const response = await request(app).get('/status');
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('healthy');
+    expect(response.body.version).toBe('1.0.0');
+  });
+
+});
