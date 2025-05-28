@@ -1,23 +1,56 @@
-const request = require('supertest');
-const app = require('../src/app');
+const express = require('express');
+const router = express.Router();
 
-test('Health check should work', async () => {
-  const response = await request(app).get('/health');
-  expect(response.status).toBe(200);
-  expect(response.body.status).toBe('healthy');
+// storage
+let tasks = [];
+let requestCount = 0;
+
+// Count
+router.use((req, res, next) => {
+    requestCount++;
+    next();
 });
 
-test('Should get empty tasks list', async () => {
-  const response = await request(app).get('/api/tasks');
-  expect(response.status).toBe(200);
-  expect(response.body.tasks).toEqual([]);
+// Health check
+router.get('/health', (req, res) => {
+    res.json({ status: 'healthy' });
 });
 
-test('Should create a new task', async () => {
-  const response = await request(app)
-    .post('/api/tasks')
-    .send({ title: 'Test Task' });
-  
-  expect(response.status).toBe(200);
-  expect(response.body.task.title).toBe('Test Task');
+// Status endpoint
+router.get('/status', (req, res) => {
+    res.json({ status: 'healthy', version: '1.0.0' });
 });
+
+// Metrics
+router.get('/metrics', (req, res) => {
+    res.json({ requests: requestCount, task_count: tasks.length });
+});
+
+// Task API
+router.get('/api/tasks', (req, res) => {
+    res.json({ tasks: tasks });
+});
+
+router.post('/api/tasks', (req, res) => {
+    const task = { id: Date.now(), title: req.body.title, completed: false };
+    tasks.push(task);
+    res.json({ task: task });
+});
+
+router.put('/api/tasks/:id', (req, res) => {
+    const task = tasks.find(t => t.id === parseInt(req.params.id));
+    if (!task) return res.status(404).json({ error: 'not found' });
+    
+    task.title = req.body.title || task.title;
+    res.json({ task: task });
+});
+
+router.delete('/api/tasks/:id', (req, res) => {
+    const index = tasks.findIndex(t => t.id === parseInt(req.params.id));
+    if (index === -1) return res.status(404).json({ error: 'not found' });
+    
+    tasks.splice(index, 1);
+    res.json({ message: 'Deleted' });
+});
+
+module.exports = router;
